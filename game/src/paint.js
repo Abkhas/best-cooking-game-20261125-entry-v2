@@ -4,7 +4,7 @@
 // wok progress rings, and a shift timer that changes colour as the
 // shift runs out. The cover shot is staged to show all of it at once.
 
-import { INGREDIENTS, RECIPES } from './menu.js';
+import { INGREDIENTS, RECIPES, recipeFor } from './menu.js';
 import { STATIONS, stationCenter } from './chef.js';
 import { SHIFT_SECONDS, RUSH_AT } from './board.js';
 
@@ -117,9 +117,10 @@ function drawTicket(ctx, t, x, y, w, h) {
   }
   if (!t.recipe.wok) text(ctx, 'NO WOK', x + w - 10, y + 40, 10, '#2e7d32', 'bold', 'right');
   ctx.fillStyle = '#e0e0e0';
-  rr(ctx, x + 10, y + h - 12, w - 20, 7, 3); ctx.fill();
+  rr(ctx, x + 10, y + h - 14, w - 20, 10, 5); ctx.fill();
   ctx.fillStyle = patienceColor(share);
-  rr(ctx, x + 10, y + h - 12, (w - 20) * share, 7, 3); ctx.fill();
+  rr(ctx, x + 10, y + h - 14, (w - 20) * share, 10, 5); ctx.fill();
+  text(ctx, `${Math.ceil(t.patience)}s`, x + w / 2, y + h - 9, 9, '#ffffff');
 }
 
 function drawWok(ctx, wok, s, label) {
@@ -139,7 +140,7 @@ function drawWok(ctx, wok, s, label) {
     drawDish(ctx, wok.recipe.id, cx, cy, 30);
     const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 180);
     ctx.globalAlpha = pulse;
-    text(ctx, 'READY!', cx, cy - 34, 15, '#ffd54f');
+    text(ctx, `READY! +$${wok.recipe.price}`, cx, cy - 34, 13, '#ffd54f');
     ctx.globalAlpha = 1;
   } else if (wok.cooking > 0) {
     const share = Math.min(1, wok.cooking / wok.cookSecs);
@@ -149,7 +150,8 @@ function drawWok(ctx, wok, s, label) {
     ctx.beginPath(); ctx.arc(cx, cy, 18, 0, 7); ctx.fill();
     ctx.strokeStyle = '#69f0ae'; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(cx, cy, 26, -Math.PI / 2, -Math.PI / 2 + share * Math.PI * 2); ctx.stroke();
-    text(ctx, `${Math.ceil(wok.cookSecs - wok.cooking)}s`, cx, cy, 14, '#263238');
+    text(ctx, `${Math.ceil(wok.cookSecs - wok.cooking)}s`, cx, cy - 1, 13, '#263238');
+    text(ctx, `${Math.round(share * 100)}%`, cx, cy + 13, 9, '#263238');
   } else {
     ctx.fillStyle = '#546e7a';
     ctx.beginPath(); ctx.arc(cx, cy, 20, 0, 7); ctx.fill();
@@ -244,8 +246,8 @@ export function drawGame(ctx, game) {
   ctx.fillRect(0, 60, VIEW_W, 8);
 
   // ---- HUD ----
-  text(ctx, 'SIZZLE & SERVE', 24, 24, 24, '#ffd54f', 'bold', 'left');
-  text(ctx, 'WARUNG RUSH', 24, 46, 11, '#ffcc80', 'bold', 'left');
+  text(ctx, 'WARUNG BU SARI', 24, 24, 24, '#ffd54f', 'bold', 'left');
+  text(ctx, 'GANG MAWAR • EST. 1987', 24, 46, 11, '#ffcc80', 'bold', 'left');
   const remain = Math.max(0, SHIFT_SECONDS - game.elapsed);
   const mm = Math.floor(remain / 60);
   const ss = String(Math.floor(remain % 60)).padStart(2, '0');
@@ -263,6 +265,7 @@ export function drawGame(ctx, game) {
   text(ctx, `🪙 ${board.coins}`, 900, 26, 20, '#ffd54f', 'bold', 'left');
   text(ctx, board.combo > 1 ? `COMBO x${board.combo}` : 'COMBO —', 1010, 26, 16, board.combo > 1 ? '#ff7043' : '#b0bec5', 'bold', 'left');
   text(ctx, `SERVED ${board.served}`, 1130, 26, 16, '#eceff1', 'bold', 'left');
+  text(ctx, `MISSED ${board.lost}`, 1130, 46, 11, board.lost > 0 ? '#ff8a65' : '#90a4ae', 'bold', 'left');
   for (let i = 0; i < 3; i++) {
     text(ctx, '♥', 1210 + i * 20, 26, 16, i < game.hearts ? '#ff5252' : '#546e7a');
   }
@@ -331,7 +334,29 @@ export function drawGame(ctx, game) {
   rr(ctx, 280, 430, 720, 100, 16); ctx.fill();
   ctx.fillStyle = '#6d4c41';
   rr(ctx, 292, 442, 696, 76, 12); ctx.fill();
-  text(ctx, 'PREP ISLAND', 640, 462, 11, '#d7ccc8');
+  text(ctx, 'PREP ISLAND', 308, 462, 11, '#d7ccc8', 'bold', 'left');
+  // Mid-assembly counter: what the carried ingredients add up to so far.
+  const rawIds = chef.carrying.filter((c) => !c.id.startsWith('dish:') && c.id !== 'burnt').map((c) => c.id);
+  const exact = recipeFor(rawIds);
+  let racik = 'RACIK —';
+  const carriedDish = chef.carrying.find((c) => c.id.startsWith('dish:'));
+  if (exact) {
+    racik = `RACIK: ${exact.name.toUpperCase()} ${rawIds.length}/${exact.needs.length} ✓`;
+  } else if (carriedDish) {
+    // A finished dish in hand is a completed assembly.
+    const done = RECIPES.find((r) => r.id === carriedDish.id.slice(5));
+    if (done) racik = `RACIK: ${done.name.toUpperCase()} ${done.needs.length}/${done.needs.length} ✓`;
+  } else if (rawIds.length > 0) {
+    let best = null;
+    let bestHit = 0;
+    for (const r of RECIPES) {
+      const hit = rawIds.filter((id) => r.needs.includes(id)).length;
+      if (hit > bestHit) { bestHit = hit; best = r; }
+    }
+    if (best) racik = `RACIK: ${best.name.toUpperCase()} ${bestHit}/${best.needs.length}`;
+    else racik = `RACIK ${rawIds.length}/4`;
+  }
+  text(ctx, racik, 972, 462, 11, '#aed581', 'bold', 'right');
   chef.carrying.forEach((c, i) => {
     const x = 340 + i * 110;
     const y = 492;
@@ -364,7 +389,7 @@ export function drawGame(ctx, game) {
   ctx.fillStyle = '#fff8e7';
   rr(ctx, 1090, 560, 166, 130, 10); ctx.fill();
   ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 2; ctx.stroke();
-  text(ctx, "TODAY'S MENU", 1173, 578, 12, '#e65100');
+  text(ctx, 'MENU BU SARI', 1173, 578, 12, '#e65100');
   RECIPES.forEach((r, i) => {
     text(ctx, `${r.name} $${r.price}`, 1100, 600 + i * 18, 11, '#5d4037', 'normal', 'left');
   });
@@ -387,8 +412,8 @@ export function drawGame(ctx, game) {
   if (game.phase === 'title') {
     ctx.fillStyle = 'rgba(38,50,56,0.72)';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    text(ctx, 'SIZZLE & SERVE', 640, 250, 64, '#ffd54f');
-    text(ctx, '— WARUNG RUSH —', 640, 310, 26, '#ffcc80');
+    text(ctx, 'WARUNG BU SARI', 640, 250, 64, '#ffd54f');
+    text(ctx, '— Gang Mawar’s busiest kitchen —', 640, 310, 26, '#ffcc80');
     text(ctx, 'Cook the tickets before patience runs out.', 640, 360, 20, '#ffffff');
     text(ctx, 'Arrows / WASD to move • E or Space to use a station • Click a station to walk to it', 640, 400, 16, '#eceff1');
     text(ctx, 'Chop → wok → plate → serve. Gado-gado skips the wok.', 640, 430, 16, '#eceff1');

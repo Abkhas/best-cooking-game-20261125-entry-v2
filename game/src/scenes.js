@@ -45,9 +45,10 @@ export function applyShot(game, name) {
   setWok(chef.wok2, null, 0, 0, false, false);
 
   if (name === 'cover') {
-    // The busiest, most complete moment: lunch rush, both woks going
-    // (one READY), a plated dish, four tickets queued, the cook carrying
-    // a finished dish toward the serve window, a happy customer eating.
+    // The busiest, most complete moment: lunch rush, BOTH woks cooking
+    // with % progress showing, a plated dish, four tickets queued with
+    // their seconds left, the cook carrying a finished dish toward the
+    // serve window, a happy customer eating.
     game.elapsed = 112;
     board._elapsed = 112;
     board.coins = 540; board.combo = 4; board.served = 8;
@@ -61,7 +62,7 @@ export function applyShot(game, name) {
     chef.x = c.x - 190; chef.y = c.y + 60;
     chef.carrying = [{ id: 'dish:soto-ayam', prepped: true }];
     setWok(chef.wok, 'nasi-goreng', 4.2, 6, false, false);
-    setWok(chef.wok2, 'mie-goreng', 7, 7, true, false);
+    setWok(chef.wok2, 'mie-goreng', 5.6, 7, false, false);
     chef.plateDish = 'gado-gado';
     game.lastServeAt = performance.now();
     game.servedTable = 1;

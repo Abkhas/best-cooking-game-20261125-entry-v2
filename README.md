@@ -1,9 +1,10 @@
-# Sizzle & Serve — Warung Rush (v2 challenger)
+# Warung Bu Sari — Gang Mawar (v2 challenger)
 
-A complete cooking game in plain static files: run a one-cook Indonesian
-warung through a 3-minute shift. Tickets arrive on the order board, the
-cook grabs ingredients from the crates, chops what needs chopping, fires
-the woks, plates, and serves before patience runs out.
+A complete cooking game in plain static files: run Bu Sari's one-cook
+warung on Gang Mawar through a 3-minute shift. Tickets arrive on the
+order board, the cook grabs ingredients from the crates, chops what
+needs chopping, fires the woks, plates, and serves before patience
+runs out.
 
 ## What v2 changes vs v1
 
@@ -18,14 +19,23 @@ the woks, plates, and serves before patience runs out.
   matters more than running fast.
 - **Feel.** Every action answers at once: a floater (`CHOP CHOP!`,
   `SERVED! +$90`), a blip, a progress ring on chopping and on each wok,
-  a `READY!` pulse, and a shift timer that shifts green → amber → red
+  a `READY! +$70` pulse, and a shift timer that shifts green → amber → red
   and pulses under 30 seconds.
 - **Customers eat.** Three dining tables seat customers; serve a dish
   and the matching table's customer smiles with the plate in front of
   them, so the service rush reads in a glance.
-- **Cover staged at the busiest moment.** Lunch rush, both woks going
-  (one `READY!`), a plated gado-gado, four tickets queued, the cook
+- **Cover staged at the busiest moment.** Lunch rush, both woks cooking
+  with % progress, a plated gado-gado, four tickets queued, the cook
   carrying soto ayam to the serve window, a happy customer eating.
+- **Rival-research polish (25 Nov, before round 2).** Every ticket now
+  shows its seconds left on its patience bar; woks show `%` progress
+  beside the countdown; the prep island carries a `RACIK` mid-assembly
+  counter (`RACIK: MIE GORENG 2/3`); the HUD counts `MISSED` dishes
+  next to `SERVED`; a ready wok names its price (`READY! +$70`).
+  The kitchen keeps its dark anchors — dark woks, crates and prep
+  island against the warm floor — so the food stays saturated and
+  readable, never pale-on-pale. Identity is specific now: this is Bu
+  Sari's warung on Gang Mawar, not a generic "Sizzle & Serve".
 
 ## How to play
 

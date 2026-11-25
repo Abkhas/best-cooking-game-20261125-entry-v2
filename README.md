@@ -37,6 +37,31 @@ runs out.
   readable, never pale-on-pale. Identity is specific now: this is Bu
   Sari's warung on Gang Mawar, not a generic "Sizzle & Serve".
 
+## What v2p (polish challenger) changes vs v2-polished
+
+- **The middle band is a working counter now, not bare floor.** A
+  GARNISH PASS fills it — dark wood, brass edge, four labeled garnish
+  bowls (BAWANG / SAMBAL / JERUK / DAUN BAWANG), a dish mid-garnish
+  (TABUR…), and a batik runner under it — so the busiest part of the
+  kitchen reads in the cover, not just the top row.
+- **One new depth mechanic, visible in screenshots: garnish.** Carry a
+  finished dish to the pass and press E to TABUR it — garnished dishes
+  earn a +$15 tip on serve (menu card says so, the pass flashes
+  "TABUR NOW! +$15 TIP [E]" when you hold an ungarnished dish, a ✦
+  marks the finished plate). Optional, never a chore: an ungarnished
+  dish still serves, so the old loop is untouched.
+- **Wok burn pressure you can see.** A ready wok now smokes, drains a
+  red burn bar, and flashes "🔥 BURN IN 2s — GRAB IT!" for its last
+  three seconds on the pass — the grab-it-now moment is in the cover.
+- **Denser labeled micro-feedback.** Every ticket shows its in-hand
+  progress (✓ 1/3) or its fast-serve tip on the patience bar
+  ("26s • FAST +$21"); every station carries a dark-pill state line
+  (CHOP [E], SEARING 71%, READY +$70 — GRAB [E], EMPTY — BRING RACIK,
+  MIE GORENG $70 — READY); the menu card lists the garnish tip.
+- **Served dishes land.** A served dish now stays on its table with its
+  customer eating it (two happy eaters in the cover), instead of
+  vanishing at the window — the service loop closes visibly.
+
 ## How to play
 
 Arrows / WASD to move, E or Space to use a station, click a station to

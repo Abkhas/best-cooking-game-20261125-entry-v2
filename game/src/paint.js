@@ -100,7 +100,7 @@ function patienceColor(share) {
   return share > 0.5 ? '#43a047' : share > 0.25 ? '#fb8c00' : '#e53935';
 }
 
-function drawTicket(ctx, t, x, y, w, h) {
+function drawTicket(ctx, t, x, y, w, h, chef) {
   const share = Math.max(0, t.patience / t.patienceMax);
   const urgent = share < 0.25 || t.flash > 0;
   ctx.fillStyle = urgent && Math.floor(performance.now() / 250) % 2 === 0 ? '#ffebee' : '#ffffff';
@@ -116,11 +116,26 @@ function drawTicket(ctx, t, x, y, w, h) {
     ix += 30;
   }
   if (!t.recipe.wok) text(ctx, 'NO WOK', x + w - 10, y + 40, 10, '#2e7d32', 'bold', 'right');
+  // Per-order progress: how much of this ticket is already in hand.
+  // Short, out of the icons' way; the fast-serve tip rides the bar's
+  // seconds line instead, where it never collides with anything.
+  let matched = 0;
+  if (chef) {
+    const dish = chef.carrying.find((c) => c.id === `dish:${t.recipe.id}`);
+    matched = dish ? t.recipe.needs.length
+      : t.recipe.needs.filter((n) => chef.carrying.some((c) => c.id === n)).length;
+  }
+  if (matched > 0) {
+    const label = `✓ ${matched}/${t.recipe.needs.length}`;
+    if (t.recipe.wok) text(ctx, label, x + w - 10, y + 40, 10, '#2e7d32', 'bold', 'right');
+    else text(ctx, label, x + w / 2, y + 40, 10, '#2e7d32', 'bold');
+  }
   ctx.fillStyle = '#e0e0e0';
   rr(ctx, x + 10, y + h - 14, w - 20, 10, 5); ctx.fill();
   ctx.fillStyle = patienceColor(share);
   rr(ctx, x + 10, y + h - 14, (w - 20) * share, 10, 5); ctx.fill();
-  text(ctx, `${Math.ceil(t.patience)}s`, x + w / 2, y + h - 9, 9, '#ffffff');
+  const fastTip = matched === 0 && share > 0.6 ? Math.round(t.recipe.price * 0.4 * share) : 0;
+  text(ctx, fastTip > 0 ? `${Math.ceil(t.patience)}s • FAST +$${fastTip}` : `${Math.ceil(t.patience)}s`, x + w / 2, y + h - 9, 9, '#ffffff');
 }
 
 function drawWok(ctx, wok, s, label) {
@@ -142,6 +157,24 @@ function drawWok(ctx, wok, s, label) {
     ctx.globalAlpha = pulse;
     text(ctx, `READY! +$${wok.recipe.price}`, cx, cy - 34, 13, '#ffd54f');
     ctx.globalAlpha = 1;
+    if (wok.overSecs > 3) {
+      // About to burn: smoke, a red drain bar, and a flashing warning
+      // under the wok — the grab-it-now pressure reads at a glance.
+      ctx.fillStyle = 'rgba(120,120,120,0.55)';
+      ctx.beginPath(); ctx.arc(cx - 14, cy - 42, 9, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 10, cy - 50, 7, 0, 7); ctx.fill();
+      ctx.fillStyle = '#546e7a';
+      rr(ctx, cx - 50, s.y + s.h + 4, 100, 6, 3); ctx.fill();
+      ctx.fillStyle = '#e53935';
+      rr(ctx, cx - 50, s.y + s.h + 4, 100 * Math.min(1, wok.overSecs / 6), 6, 3); ctx.fill();
+      const flash = Math.floor(performance.now() / 200) % 2 === 0;
+      const warn = `🔥 BURN IN ${Math.max(0, Math.ceil(6 - wok.overSecs))}s — GRAB IT!`;
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      const ww = ctx.measureText(warn).width;
+      ctx.fillStyle = 'rgba(38,50,56,0.88)';
+      rr(ctx, cx - ww / 2 - 8, s.y + s.h + 14, ww + 16, 20, 10); ctx.fill();
+      text(ctx, warn, cx, s.y + s.h + 24, 12, flash ? '#ff5252' : '#ff8a65');
+    }
   } else if (wok.cooking > 0) {
     const share = Math.min(1, wok.cooking / wok.cookSecs);
     ctx.fillStyle = '#ff8f00';
@@ -182,6 +215,7 @@ function drawChef(ctx, chef) {
   for (const c of chef.carrying) {
     if (c.id.startsWith('dish:')) {
       drawDish(ctx, c.id.slice(5), ix, y - 52, 15);
+      if (c.garnished) text(ctx, '✦', ix + 14, y - 66, 14, '#aed581');
     } else if (c.id === 'burnt') {
       ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(ix, y - 52, 11, 0, 7); ctx.fill();
     } else {
@@ -277,7 +311,7 @@ export function drawGame(ctx, game) {
     rr(ctx, 1056, 74, 200, 26, 8); ctx.fill();
     text(ctx, '🔥 LUNCH RUSH!', 1156, 87, 13, '#ffffff');
   }
-  board.tickets.forEach((t, i) => drawTicket(ctx, t, 24 + i * 300, 96, 284, 56));
+  board.tickets.forEach((t, i) => drawTicket(ctx, t, 24 + i * 300, 96, 284, 56, chef));
   if (board.tickets.length === 0) text(ctx, 'No orders — breathe!', 170, 124, 14, '#8d6e63', 'normal', 'left');
 
   // ---- ingredient crates ----
@@ -329,6 +363,80 @@ export function drawGame(ctx, game) {
   ctx.lineTo(trash.x + 56, trash.y + 58); ctx.lineTo(trash.x + 34, trash.y + 58); ctx.closePath(); ctx.fill();
   text(ctx, 'TRASH', trash.x + trash.w / 2, trash.y + trash.h - 8, 10, '#e0e0e0');
 
+  // ---- garnish pass: fills the old empty middle band ----
+  // A dark-wood finishing counter with four garnish bowls and one dish
+  // mid-garnish, so the band shows work in progress, not bare floor.
+  const pass = { x: 280, y: 300, w: 780, h: 92 };
+  ctx.fillStyle = '#4e342e';
+  rr(ctx, pass.x, pass.y, pass.w, pass.h, 14); ctx.fill();
+  ctx.fillStyle = '#6d4c41';
+  rr(ctx, pass.x + 6, pass.y + 6, pass.w - 12, pass.h - 12, 10); ctx.fill();
+  ctx.fillStyle = '#ffb300';
+  ctx.fillRect(pass.x + 6, pass.y + 6, pass.w - 12, 4);
+  text(ctx, 'GARNISH PASS', pass.x + 18, pass.y + 24, 13, '#ffd54f', 'bold', 'left');
+  const handDish = chef.carrying.find((c) => c.id.startsWith('dish:'));
+  const taburHot = handDish && !handDish.garnished;
+  text(ctx, taburHot ? 'TABUR NOW! +$15 TIP [E]' : 'TABUR +$15 TIP [E]', pass.x + 18, pass.y + 46, 11, taburHot ? '#aed581' : '#d7ccc8', 'bold', 'left');
+  text(ctx, 'bawang • sambal • jeruk • daun bawang', pass.x + 18, pass.y + 66, 10, '#bcaaa4', 'normal', 'left');
+  for (const b of [
+    { x: 560, label: 'BAWANG', color: '#ffcf4d' },
+    { x: 660, label: 'SAMBAL', color: '#e8402f' },
+    { x: 760, label: 'JERUK', color: '#8bc34a' },
+    { x: 860, label: 'DAUN BAWANG', color: '#57ab5a' },
+  ]) {
+    ctx.fillStyle = '#3e2723';
+    ctx.beginPath(); ctx.arc(b.x, pass.y + 40, 19, 0, 7); ctx.fill();
+    ctx.fillStyle = b.color;
+    ctx.beginPath(); ctx.arc(b.x, pass.y + 36, 13, Math.PI, 0); ctx.fill();
+    text(ctx, b.label, b.x, pass.y + 72, 9, '#d7ccc8');
+  }
+  if (game.passDish) {
+    drawDish(ctx, game.passDish, 930, pass.y + 42, 26);
+    text(ctx, 'TABUR…', 930, pass.y + 16, 10, '#aed581', 'bold');
+    text(ctx, '✦', 956, pass.y + 20, 13, '#ffd54f');
+  }
+  // Batik runner under the pass, so the band reads as dressed floor.
+  ctx.fillStyle = '#7f3b2e';
+  ctx.fillRect(280, 396, 780, 30);
+  ctx.fillStyle = '#ffb300';
+  for (let rx = 300; rx < 1060; rx += 48) {
+    ctx.save();
+    ctx.translate(rx, 411);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.restore();
+  }
+
+  // ---- station state lines: the next move reads at a glance ----
+  // A dark pill behind each line, so pale text never sits on bare floor.
+  const stateLine = (s, line, color) => {
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    const w = ctx.measureText(line).width;
+    const cx = s.x + s.w / 2;
+    const cy = s.y + s.h + 14;
+    ctx.fillStyle = 'rgba(38,50,56,0.85)';
+    rr(ctx, cx - w / 2 - 7, cy - 9, w + 14, 18, 9); ctx.fill();
+    text(ctx, line, cx, cy, 11, color);
+  };
+  if (chef.chopping) {
+    stateLine(STATIONS.chop, `CHOPPING ${Math.round((chef.chopping.done / chef.chopping.total) * 100)}%`, '#aed581');
+  } else {
+    stateLine(STATIONS.chop, 'CHOP [E]', '#b0bec5');
+  }
+  for (const [wok, s] of [[chef.wok, STATIONS.wok1], [chef.wok2, STATIONS.wok2]]) {
+    if (wok.burnt) stateLine(s, 'BURNT — TRASH IT', '#ff7043');
+    else if (wok.ready) {
+      if (wok.overSecs <= 3) stateLine(s, `READY +$${wok.recipe.price} — GRAB [E]`, '#ffd54f');
+    } else if (wok.cooking > 0) stateLine(s, `SEARING ${Math.round((wok.cooking / wok.cookSecs) * 100)}%`, '#ffcc80');
+    else stateLine(s, 'EMPTY — BRING RACIK', '#b0bec5');
+  }
+  if (chef.plateDish) {
+    const pr = RECIPES.find((r) => r.id === chef.plateDish);
+    stateLine(STATIONS.plate, `${pr.name.toUpperCase()} $${pr.price} — READY`, '#ffd54f');
+  } else {
+    stateLine(STATIONS.plate, 'PLATE [E]', '#b0bec5');
+  }
+
   // ---- prep island: what the cook is carrying, laid out ----
   ctx.fillStyle = 'rgba(93,64,55,0.55)';
   rr(ctx, 280, 430, 720, 100, 16); ctx.fill();
@@ -362,7 +470,10 @@ export function drawGame(ctx, game) {
     const y = 492;
     ctx.fillStyle = '#fff8e7';
     ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.fill();
-    if (c.id.startsWith('dish:')) drawDish(ctx, c.id.slice(5), x, y, 24);
+    if (c.id.startsWith('dish:')) {
+      drawDish(ctx, c.id.slice(5), x, y, 24);
+      if (c.garnished) text(ctx, '✦', x + 20, y - 20, 14, '#ffd54f');
+    }
     else if (c.id === 'burnt') { ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(x, y, 18, 0, 7); ctx.fill(); }
     else drawIngredient(ctx, INGREDIENTS[c.id].draw, x, y, 20);
     if (!c.prepped && INGREDIENTS[c.id]) text(ctx, 'RAW', x, y + 34, 9, '#ff8a65');
@@ -373,6 +484,8 @@ export function drawGame(ctx, game) {
   drawChef(ctx, chef);
 
   // ---- dining tables with customers ----
+  // A served dish lands on its table and its customer eats it: the
+  // service loop closes visibly instead of vanishing at the window.
   const happy = game.lastServeAt && performance.now() - game.lastServeAt < 3000;
   const tableXs = [380, 700, 1020];
   tableXs.forEach((tx, i) => {
@@ -381,18 +494,20 @@ export function drawGame(ctx, game) {
     ctx.fillStyle = '#8d6e63';
     ctx.fillRect(tx - 100, 690, 16, 30);
     ctx.fillRect(tx + 84, 690, 16, 30);
-    const mood = happy && i === (game.servedTable ?? 0) ? 'happy' : (board.tickets.length > i ? 'waiting' : 'idle');
-    drawCustomer(ctx, tx, 566, mood, happy && i === (game.servedTable ?? 0) ? game.lastDish : null);
+    const servedDish = game.tableDishes && game.tableDishes[i];
+    const mood = servedDish ? 'happy' : (happy && i === (game.servedTable ?? 0) ? 'happy' : (board.tickets.length > i ? 'waiting' : 'idle'));
+    drawCustomer(ctx, tx, 566, mood, servedDish || (happy && i === (game.servedTable ?? 0) ? game.lastDish : null));
   });
 
   // ---- today's menu card ----
   ctx.fillStyle = '#fff8e7';
-  rr(ctx, 1090, 560, 166, 130, 10); ctx.fill();
+  rr(ctx, 1090, 560, 166, 150, 10); ctx.fill();
   ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 2; ctx.stroke();
   text(ctx, 'MENU BU SARI', 1173, 578, 12, '#e65100');
   RECIPES.forEach((r, i) => {
     text(ctx, `${r.name} $${r.price}`, 1100, 600 + i * 18, 11, '#5d4037', 'normal', 'left');
   });
+  text(ctx, '✦ GARNISH +$15 TIP', 1100, 694, 10, '#2e7d32', 'bold', 'left');
 
   // ---- floaters ----
   for (const f of game.floaters) {

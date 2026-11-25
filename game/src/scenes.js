@@ -33,6 +33,9 @@ export function applyShot(game, name) {
   game.lastServeAt = 0;
   game.servedTable = 0;
   game.lastDish = null;
+  game.passDish = null;
+  game.tableDishes = {};
+  game.floaters = [];
   board.tickets = [];
   board.coins = 0;
   board.combo = 0;
@@ -45,10 +48,10 @@ export function applyShot(game, name) {
   setWok(chef.wok2, null, 0, 0, false, false);
 
   if (name === 'cover') {
-    // The busiest, most complete moment: lunch rush, BOTH woks cooking
-    // with % progress showing, a plated dish, four tickets queued with
-    // their seconds left, the cook carrying a finished dish toward the
-    // serve window, a happy customer eating.
+    // The busiest, most complete moment: lunch rush, wok 1 searing at
+    // 70%, wok 2 READY and about to burn (BURN IN 2s!), a garnished dish
+    // in hand, a dish mid-garnish on the pass, a plated gado-gado, four
+    // tickets queued with seconds left, and two customers eating.
     game.elapsed = 112;
     board._elapsed = 112;
     board.coins = 540; board.combo = 4; board.served = 8;
@@ -60,13 +63,17 @@ export function applyShot(game, name) {
     ];
     const c = stationCenter('serve');
     chef.x = c.x - 190; chef.y = c.y + 60;
-    chef.carrying = [{ id: 'dish:soto-ayam', prepped: true }];
+    chef.carrying = [{ id: 'dish:soto-ayam', prepped: true, garnished: true }];
     setWok(chef.wok, 'nasi-goreng', 4.2, 6, false, false);
-    setWok(chef.wok2, 'mie-goreng', 5.6, 7, false, false);
+    setWok(chef.wok2, 'mie-goreng', 7, 7, true, false);
+    chef.wok2.overSecs = 4.5;
     chef.plateDish = 'gado-gado';
+    game.passDish = 'mie-goreng';
+    game.tableDishes = { 0: 'nasi-goreng', 1: 'ayam-geprek' };
     game.lastServeAt = performance.now();
     game.servedTable = 1;
     game.lastDish = 'ayam-geprek';
+    game.floaters.push({ text: 'GARNISHED! ✦ +$15', x: 983, y: 296, life: 1.4, max: 1.4, color: '#aed581' });
   } else if (name === 'orders') {
     game.elapsed = 20;
     board._elapsed = 20;
@@ -89,11 +96,14 @@ export function applyShot(game, name) {
       ticket(2, 'soto-ayam', 30, 38),
     ];
     const c = stationCenter('chop');
-    chef.x = c.x; chef.y = c.y + 90;
+    // At the chop board's right side, so the CHOPPING % pill stays visible.
+    chef.x = c.x + 70; chef.y = c.y + 38;
     chef.carrying = [{ id: 'chicken', prepped: false }];
     chef.chopping = { item: chef.carrying[0], done: 1.2, total: 1.6 };
     setWok(chef.wok, 'mie-goreng', 2.8, 7, false, false);
     setWok(chef.wok2, 'nasi-goreng', 6, 6, true, false);
+    chef.wok2.overSecs = 4.0;
+    game.passDish = 'ayam-geprek';
   } else if (name === 'plating') {
     game.elapsed = 150;
     board._elapsed = 150;
@@ -102,11 +112,13 @@ export function applyShot(game, name) {
       ticket(1, 'soto-ayam', 22, 34),
       ticket(2, 'nasi-goreng', 8, 32),
     ];
-    const c = stationCenter('plate');
-    chef.x = c.x + 110; chef.y = c.y + 80;
-    chef.carrying = [{ id: 'dish:ayam-geprek', prepped: true }];
+    // The cook stands clear of the pass's right end, garnished dish in
+    // hand, about to serve at the window.
+    chef.x = 1060; chef.y = 430;
+    chef.carrying = [{ id: 'dish:ayam-geprek', prepped: true, garnished: true }];
     chef.plateDish = 'mie-goreng';
     setWok(chef.wok, 'soto-ayam', 5.4, 9, false, false);
+    game.tableDishes = { 0: 'nasi-goreng' };
     game.lastServeAt = performance.now();
     game.servedTable = 0;
     game.lastDish = 'nasi-goreng';
@@ -165,9 +177,15 @@ export function runSelfTest(game) {
   step(30);
   at('plate'); pressE();
   log.push(`gado-gado plated: ${chef.plateDish}`);
+  // Garnish path: pick the plated dish up, finish it at the garnish pass.
+  at('plate'); pressE();
+  log.push(`carrying after plate pickup: ${chef.carrying.map((c) => c.id).join(',')}`);
+  at('garnish'); pressE();
+  const garnishOk = chef.carrying[0]?.garnished === true;
+  log.push(`gado-gado garnished: ${chef.carrying[0]?.garnished}`);
 
   const passed = board.served === 1 && board.coins > 0
-    && chopOk && chef.plateDish === 'gado-gado';
+    && chopOk && chef.plateDish === null && garnishOk;
   const result = { passed, served: board.served, coins: board.coins, log };
   const node = document.getElementById('selftest');
   if (node) node.textContent = JSON.stringify(result);

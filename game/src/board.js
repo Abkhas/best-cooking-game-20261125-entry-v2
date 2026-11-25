@@ -69,20 +69,21 @@ export class OrderBoard {
     return expired.length;
   }
 
-  /** Serve a finished dish. Pays more the faster it arrives, plus combo. */
-  serveDish(recipeId) {
+  /** Serve a finished dish. Pays more the faster it arrives, plus combo.
+   *  A garnished dish earns a +$15 tip on top. */
+  serveDish(recipeId, garnished) {
     const idx = this.tickets.findIndex((t) => t.recipe.id === recipeId);
     if (idx < 0) return { coins: 0, served: false };
     const ticket = this.tickets[idx];
     const speed = Math.max(0, ticket.patience / ticket.patienceMax);
-    const earned = Math.round(ticket.recipe.price * (0.6 + 0.4 * speed)) + this.combo * 10;
+    const earned = Math.round(ticket.recipe.price * (0.6 + 0.4 * speed)) + this.combo * 10 + (garnished ? 15 : 0);
     this.tickets.splice(idx, 1);
     this.served++;
     this.coins += earned;
     this.combo++;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     this.comboLeft = 20;
-    return { coins: earned, served: true, ticketId: ticket.id };
+    return { coins: earned, served: true, ticketId: ticket.id, garnishTip: garnished ? 15 : 0 };
   }
 
   /** A wrong dish at the window: the hungriest ticket loses patience. */

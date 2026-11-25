@@ -26,6 +26,8 @@ const game = {
   lastServeAt: 0,
   servedTable: 0,
   lastDish: null,
+  passDish: null, // recipe id of the dish mid-garnish on the pass
+  tableDishes: {}, // table index -> recipe id landed there by a serve
 };
 
 const keys = new Set();
@@ -48,6 +50,8 @@ function resetShift() {
   game.hearts = 3;
   game.floaters = [];
   game.lastServeAt = 0;
+  game.passDish = null;
+  game.tableDishes = {};
   game.phase = 'playing';
 }
 
@@ -74,6 +78,8 @@ window.addEventListener('keydown', (e) => {
       game.lastServeAt = performance.now();
       game.servedTable = (board.served - 1) % 3;
       game.lastDish = dishInHand ? dishInHand.id.slice(5) : null;
+      // The served dish lands on its table, where its customer eats it.
+      game.tableDishes[game.servedTable] = game.lastDish;
     }
     if (board.coins > before) floatText(game, `+$${board.coins - before}`, chef.x, chef.y - 80, '#69f0ae');
     return;

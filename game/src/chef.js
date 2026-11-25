@@ -23,6 +23,10 @@ export const STATIONS = {
   wok1:    { x: 520, y: 170, w: 140, h: 84 },
   wok2:    { x: 700, y: 170, w: 140, h: 84 },
   plate:   { x: 880, y: 170, w: 140, h: 84 },
+  // The garnish pass fills the middle band: finish a plated dish here
+  // for a +$15 tip before serving. Its right end, where the dish sits,
+  // is the interact zone — far from the chop board so E never misfires.
+  garnish: { x: 880, y: 300, w: 180, h: 90 },
   serve:   { x: 1090, y: 250, w: 166, h: 180 },
   trash:   { x: 1090, y: 470, w: 90, h: 76 },
 };
@@ -133,7 +137,7 @@ export class Chef {
       }
       if (wok.ready) {
         if (this.carrying.length >= this.maxCarry) { say('HANDS FULL!', '#ff8a65'); return; }
-        this.carrying.push({ id: `dish:${wok.recipe.id}`, prepped: true });
+        this.carrying.push({ id: `dish:${wok.recipe.id}`, prepped: true, garnished: false });
         say(`${wok.recipe.name.toUpperCase()} READY!`, '#ffd54f');
         Object.assign(wok, newWok());
         blip(880);
@@ -157,10 +161,20 @@ export class Chef {
       return;
     }
 
+    if (station === 'garnish') {
+      const dish = this.carrying.find((c) => c.id.startsWith('dish:'));
+      if (!dish) { say('BRING A DISH TO GARNISH', '#b0bec5'); return; }
+      if (dish.garnished) { say('ALREADY GARNISHED ✦', '#aed581'); return; }
+      dish.garnished = true;
+      say('GARNISHED! ✦ +$15 TIP', '#aed581');
+      blip(990);
+      return;
+    }
+
     if (station === 'plate') {
       if (this.plateDish) {
         if (this.carrying.length >= this.maxCarry) { say('HANDS FULL!', '#ff8a65'); return; }
-        this.carrying.push({ id: `dish:${this.plateDish}`, prepped: true });
+        this.carrying.push({ id: `dish:${this.plateDish}`, prepped: true, garnished: false });
         this.plateDish = null;
         say('PLATED UP!', '#ffd54f');
         blip(880);
@@ -191,7 +205,7 @@ export class Chef {
       const dish = this.carrying.find((c) => c.id.startsWith('dish:'));
       if (!dish) { say('BRING A DISH!', '#b0bec5'); return; }
       const recipeId = dish.id.slice(5);
-      const res = board.serveDish(recipeId);
+      const res = board.serveDish(recipeId, !!dish.garnished);
       this.carrying = this.carrying.filter((c) => c !== dish);
       if (res.served) {
         say(`SERVED! +$${res.coins}`, '#69f0ae');
